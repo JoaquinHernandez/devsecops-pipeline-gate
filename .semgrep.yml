@@ -1,0 +1,30 @@
+cat << 'EOF' > .semgrep.yml
+rules:
+  - id: python-command-injection-subshell
+    pattern: subprocess.$METHOD(..., shell=True, ...)
+    message: "CRITICAL: Detected shell execution via subprocess with shell=True. This allows Remote Code Execution (CWE-78)."
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      owasp: "A03:2021 - Injection"
+
+  - id: python-tls-verification-disabled
+    patterns:
+      - pattern: requests.$METHOD(..., verify=False, ...)
+    message: "HIGH: TLS certificate verification is explicitly disabled. Vulnerable to Man-in-the-Middle attacks (CWE-295)."
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-295: Improper Certificate Validation"
+      owasp: "A02:2021 - Cryptographic Failures"
+
+  - id: flask-insecure-debug-mode
+    pattern: app.run(..., debug=True, ...)
+    message: "HIGH: Flask application is running with debug=True enabled, exposing the interactive Werkzeug debugger."
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-489: Active Debug Code in Production"
+      owasp: "A05:2021 - Security Misconfiguration"
+EOF

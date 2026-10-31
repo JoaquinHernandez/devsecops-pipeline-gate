@@ -1,0 +1,89 @@
+cat << 'EOF' > .github/workflows/security-gate.yml
+name: DevSecOps Shift-Left Security Gate
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Zero permissions by default; write permissions scoped only to SARIF ingestion
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # =========================================================================
+  # Phase 1: High-Entropy Secret Detection
+  # =========================================================================
+  secret-scan:
+    name: Secret Leak Detection (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Execute Gitleaks Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_SUMMARY: true
+
+  # =========================================================================
+  # Phase 2: Static Application Security Testing (SAST)
+  # =========================================================================
+  sast-scan:
+    name: Static Code Analysis (Semgrep)
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Policy Check
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" \
+            returntocorp/semgrep semgrep scan \
+            --config=/src/.semgrep.yml \
+            --exclude='tests/fixtures/vulnerable_code.py' \
+            --error \
+            --sarif --output=/src/semgrep.sarif
+
+      - name: Ingest Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  # =========================================================================
+  # Phase 3: Container Vulnerability & Configuration Gate
+  # =========================================================================
+  container-scan:
+    name: Container CVE & Configuration Audit (Trivy)
+    runs-on: ubuntu-latest
+    needs: sast-scan
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Build Hardened Container Artifact
+        run: |
+          docker build --no-cache -t local/security-gate:${{ github.sha }} .
+
+      - name: Execute Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local/security-gate:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1' # Fails build if High or Critical vulnerabilities are present
+
+      - name: Ingest Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+EOF

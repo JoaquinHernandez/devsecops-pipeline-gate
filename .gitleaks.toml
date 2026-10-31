@@ -1,0 +1,27 @@
+cat << 'EOF' > .gitleaks.toml
+# Enterprise DevSecOps Gitleaks Baseline Configuration
+title = "Enterprise Secret Protection Policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Strict allowlist for designated test fixtures only"
+paths = [
+  '''tests/fixtures/.*'''
+]
+
+[[rules]]
+id = "generic-api-key-entropy"
+description = "High-entropy API token or secret assignment"
+regex = '''(?i)(api[_-]?key|secret[_-]?token|auth[_-]?token)[\s]*[=:][\s]*['"]([a-zA-Z0-9_\-]{20,})['"]'''
+entropy = 3.6
+secretGroup = 2
+tags = ["key", "generic", "confidential"]
+
+[[rules]]
+id = "jwt-secret-assignment"
+description = "Hardcoded JSON Web Token"
+regex = '''\b(ey[a-zA-Z0-9_=]+[.][a-zA-Z0-9_=]+[.][a-zA-Z0-9_\-\+/=]+)\b'''
+tags = ["jwt", "token"]
+EOF

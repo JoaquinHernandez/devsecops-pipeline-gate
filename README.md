@@ -1,4 +1,4 @@
-# devsecops-pipeline-gatecat << 'EOF' > README.md
+
 # Enterprise DevSecOps CI/CD Security Gate
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/bdff17d3-54f0-44c1-8f6d-9587d563c929" />
 
